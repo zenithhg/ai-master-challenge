@@ -29,6 +29,10 @@ LIMITE_ATIVO = 90  # 15 a 90 dias: ativo
 # De 91 dias até o maior ciclo da história: esfriando (selo de alerta).
 # Acima disso: sem precedente.
 
+# Rótulos de ação: valor alto = produto de $3.393 ou mais
+# (MG Advanced, GTX Pro, GTX Plus Pro e GTK 500).
+VALOR_ALTO = 3393
+
 # Simulação das segundas (validação do Clima).
 SIM_INICIO = "2017-05-01"
 SIM_FIM = "2017-08-14"       # última segunda com 138 dias para fechar até 31/12

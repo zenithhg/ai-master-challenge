@@ -171,7 +171,7 @@ Valor alto = produto de $3.393 ou mais (MG Advanced, GTX Pro, GTX Plus Pro, GTK 
 - **A correção da curva faz a diferença:** com a curva da versão 1, a receita seria $47,5 mil, abaixo do feeling.
 - **Produtividade por hora** (premissa: 8 horas por dia útil; é equivalência, não medição): o vendedor médio gerou $191 por hora de março a dezembro de 2017, com sazonalidade de trimestre (junho $254, julho $138). Com o ganho conservador de 5%, vai a $201 por hora. Com as 40 horas da semana divididas entre os 5 deals, o tempo em deal que nunca fecha cai de 14,3 horas (feeling) ou 16,2 horas (maior valor) para 12,3 horas por semana.
 - **Dinheiro parado:** $3,2 milhões sem precedente. Cada 5% recuperado vale $160 mil.
-- **Produtividade mensurável:** o vendedor mediano tem 79 negociações abertas; o foco dele (Atacar agora + Fechar rápido) tem 12.
+- **Produtividade mensurável:** o vendedor mediano tem 79 negociações abertas; o foco dele (Atacar agora + Fechar rápido) tem 11.
 - **Retirado:** o "60% para 67%" e o cenário de +$92 mil por mês da versão 1. Valiam só entre deals que fecharam, não na segunda-feira do vendedor.
 - A simulação mede a qualidade da lista, não a causa. A prova causal é o piloto (seção 7).
 
