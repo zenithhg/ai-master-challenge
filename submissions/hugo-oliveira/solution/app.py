@@ -37,9 +37,10 @@ SUBTITULO = {
     CADASTRO: "Falta o cadastro da empresa: complete ou descarte",
 }
 
+# Verde e azul para as ações de foco; vermelho fica reservado para alerta.
 EMOJI = {
-    ATACAR: "🔴", FECHAR: "🟠", QUALIFICAR: "🔵",
-    NUTRICAO: "🟢", LIMPAR: "⚪", CADASTRO: "⚫",
+    ATACAR: "🟢", FECHAR: "🔵", QUALIFICAR: "🟡",
+    NUTRICAO: "🟣", LIMPAR: "⚪", CADASTRO: "⚫",
 }
 
 ABERTO_POR_PADRAO = {ATACAR, FECHAR}
