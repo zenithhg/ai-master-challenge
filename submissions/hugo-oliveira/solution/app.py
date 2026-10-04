@@ -242,15 +242,14 @@ def tela_detalhe(opportunity_id: str) -> None:
                 "**Dica para reverter:** peça CNPJ e nome da empresa na próxima "
                 "conversa e cadastre em até 7 dias, antes de investir mais tempo nele."
             )
-        else:
-            if row["selo_esfriando"]:
-                st.warning(
-                    "🌡️ **Esfriando:** última tentativa esta semana. Depois de 138 "
-                    "dias, nenhuma venda da história fechou.\n\n"
-                    "**Dica para reverter:** ligue hoje com algo novo: uma notícia "
-                    "da empresa, um case, um convite. Não mande só \"retomando o contato\"."
-                )
-
+        if row["selo_esfriando"]:
+            st.warning(
+                "🌡️ **Esfriando:** última tentativa esta semana. Depois de 138 "
+                "dias, nenhuma venda da história fechou.\n\n"
+                "**Dica para reverter:** ligue hoje com algo novo: uma notícia "
+                "da empresa, um case, um convite. Não mande só \"retomando o contato\"."
+            )
+        if not row["selo_sem_cadastro"]:
             if raio and raio.aviso:
                 st.warning(f"⚠️ {raio.aviso}")
 
