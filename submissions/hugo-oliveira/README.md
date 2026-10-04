@@ -3,14 +3,14 @@
 ## Sobre mim
 
 - **Nome:** Hugo Oliveira
-- **LinkedIn:** _(a preencher)_
+- **LinkedIn:** [linkedin.com/in/hugo-oliveira-b0707277](https://www.linkedin.com/in/hugo-oliveira-b0707277)
 - **Challenge escolhido:** 003, Lead Scorer (Vendas / RevOps)
 
 ---
 
 ## Executive Summary
 
-Construí um app em Streamlit que o vendedor abre na segunda de manhã e vê, numa tela só, os negócios dele separados pela próxima ação ("Atacar agora", "Fechar rápido", "Qualificar em 14 dias"...), cada um com Score de 0 a 100 e chance de fechar; ao abrir o negócio, uma frase explica o número. O achado que guiou o projeto: nesta base, o perfil do cliente (setor, porte, sede) não prevê se o deal fecha; o tempo prevê. Nenhuma venda da base fechou depois de 138 dias aberta, e hoje 1.291 dos 2.089 deals abertos já passaram disso ($3,2 milhões parados). Numa simulação de 16 segundas com 30 vendedores, escolher os deals da semana pelo Score rendeu 52,5% mais receita do que perseguir o maior valor e 5% mais que o feeling, com menos da metade dos deals. Recomendo um piloto de 30 dias com metade do time para medir o efeito real.
+Construí um app em Streamlit que o vendedor abre na segunda de manhã e vê, numa tela só, os negócios dele separados pela próxima ação ("Atacar agora", "Fechar rápido", "Qualificar em 14 dias"...), cada um com Score de 0 a 100 e chance de fechar; ao abrir o negócio, uma frase explica o número. Por trás está o Clima do Deal, um algoritmo que testou os sinais que eu uso como vendedor e manteve só os que provaram nos dados: o perfil do cliente (setor, porte, sede) não prevê se o deal fecha; a idade do deal e a carga de trabalho do vendedor preveem. Nenhuma venda da base fechou depois de 138 dias aberta, e hoje 1.291 dos 2.089 deals abertos já passaram disso ($3,2 milhões parados). Numa simulação de 16 segundas com 30 vendedores, escolher os deals da semana pelo Score rendeu 52,5% mais receita do que perseguir o maior valor e 5% mais que o feeling, com menos da metade dos deals. Recomendo um piloto de 30 dias com metade do time para medir o efeito real.
 
 ---
 
@@ -46,9 +46,60 @@ python analises/fator_carga.py      # efeito do fator carga
 4. **Validação.** Simulei 16 segundas: em cada uma, cada vendedor escolhe 5 deals para a semana por três critérios (Score, maior valor e sorteio), sem olhar o futuro.
 5. **Tela pelo vendedor.** Mockup clicável primeiro, ajustado com o meu olhar de KAM, depois o código.
 
+### O algoritmo: Clima do Deal
+
+O Score responde "qual deal atacar primeiro". O Clima do Deal responde a pergunta que vem antes: "qual a chance real de este deal fechar?". A ideia é a da previsão do tempo, que junta vários sinais (temperatura, umidade, vento) numa chance de chuva. Aqui, cada sinal só entra se provar nos dados que ajuda a prever.
+
+**O desenho de partida.** Listei os 7 parâmetros que eu, como vendedor, usaria para prever um fechamento: tempo em aberto, faturamento, segmento, histórico de compra, engajamento em redes sociais, localização e vendedor. Engajamento não existe na base e foi para a v2. Com os outros, a primeira fórmula foi multiplicativa:
+
+```
+CHANCE = CHANCE_BASE(idade) × FATOR_VENDEDOR × FATOR_SETOR × FATOR_CONTA × FATOR_REGIÃO
+```
+
+Cada fator é a taxa de ganho do grupo dividida pela média: vendedor que ganha 10% acima da média vale 1,10. Uma correção minha no desenho: o tempo em aberto não é mais um fator, é o ponto de partida; colocá-lo de novo contaria o tempo duas vezes. O rascunho dessa versão está em [`process-log/desenho-inicial-clima-deal.md`](process-log/desenho-inicial-clima-deal.md).
+
+**Por que abortamos esse desenho.** A primeira simulação calculou os fatores com o resultado dos mesmos deals que avaliava, misturando passado e futuro, e deu um resultado bom demais. No autoteste do projeto, que aprende com o que fechou antes de 01/07/2017 e testa nos deals que começaram depois, vendedor, setor e conta inverteram o sinal: o grupo que era melhor no passado foi pior no futuro. Um fator que inverte piora a lista, então saiu.
+
+**O que cada parâmetro mostrou.** Um sinal liga com 5 pontos de diferença ou mais e 200 casos ou mais (`python -m lead_scorer.validacao` e `python analises/fator_carga.py`):
+
+| Parâmetro | Como foi testado | Resultado no teste | Ficou? |
+|---|---|---|---|
+| Tempo em aberto | Tábua de sobrevivência por idade | Até 90 dias, 44% a 49% ganham; de 91 a 138, 21%; depois de 138, nenhum | Sim: é a base |
+| Faturamento | Porte da conta (tercis de receita) | +1,5 pontos | Não |
+| Segmento | Setor da conta | -2,4 pontos | Não |
+| Histórico de compra | Taxa de ganho da conta; tempo desde a última compra | -0,6 e -9,2 pontos | Não |
+| Localização | Sede da conta | -0,2 pontos | Não |
+| Vendedor | Taxa de ganho do vendedor | -2,8 pontos | Não |
+| Vendedor | Carga: quantos deals ele tinha abertos quando o deal começou | +8,6, +9,8 e +8,3 pontos em 3 janelas | Sim: fator carga |
+| Região e gerente do time | Escritório e gerente do vendedor | +15,6 e +9,5 pontos | Só para o gerente: são iguais para toda a carteira do vendedor |
+| Engajamento | Não existe na base | | Para a v2 |
+
+Também caíram: número de funcionários (-2,0) e fazer parte de um grupo (-5,4). Idade da conta (+2,7) ficou em observação.
+
+**O algoritmo que ficou** (`solution/lead_scorer/clima.py`):
+
+```
+CHANCE = CHANCE_BASE(idade) × FATOR_CARGA(pouca, média ou muita carga)
+```
+
+- **Multiplicativo:** cada fator diz quanto o contexto sobe ou desce a chance de partida, e o vendedor entende ("49% pela idade, um pouco menos porque a carteira estava cheia").
+- **Carga relativa ao time:** "pouca", "média" e "muita" são tercis da carga do momento. As carteiras crescem ao longo do ano; com cortes fixos do passado, só 27 a 79 deals por janela caíam em "pouca carga" e o teste ficava sem amostra.
+- **Piso de 5%:** nenhum deal é dado como impossível, nem o que passou de 138 dias.
+- **Na sessão em que desenhamos a carga,** um teste feito na conversa (sem script no repositório) deu +15,7 pontos. O número reproduzível é o da tabela acima; a conclusão é a mesma: a carga entra.
+
+**Melhorias da v2:**
+
+| Melhoria | Por que | Dado necessário |
+|---|---|---|
+| Engajamento e nível de consciência do lead | Pela metodologia do Alfredo Soares, lead engajado e consciente da dor fecha mais rápido | Registro de interações: e-mails, ligações, demos, conteúdo consumido |
+| Recência com decaimento | Uma interação de ontem vale mais que uma de três meses atrás | Datas das interações |
+| NPS e histórico de suporte | Cliente satisfeito volta a comprar; chamado aberto trava a venda | Dados de atendimento |
+| Tamanho do deal em relação ao cliente | Deal pequeno para conta grande tende a fechar mais fácil | Já existe na base (matemática do 1%); falta testar como fator |
+| Pesquisa Win/Lost | Mede o motivo real da perda e substitui o piso de 5% | 5 perguntas ao fechar o deal |
+
 ### Como o Score funciona
 
-- **Chance de fechar (Clima do Deal):** probabilidade de um deal com essa idade terminar ganho, vinda da tábua de sobrevivência e ajustada pela carga do vendedor (quantos deals ele tinha abertos quando o deal começou; quem está sobrecarregado fecha menos).
+- **Chance de fechar:** o Clima do Deal, descrito acima (idade do deal × carga do vendedor).
 - **Valor esperado:** chance × preço de tabela do produto.
 - **Score (0 a 100):** posição do valor esperado entre os 2.089 deals abertos. Score 90 = valor esperado maior que o de 90% do pipeline.
 - **Estados pelo tempo desde o engage:** novo (0 a 14 dias), ativo (15 a 90), esfriando (91 a 138, com o selo "última tentativa esta semana"), sem precedente (mais de 138: nenhuma venda da base fechou depois disso) e a qualificar (Prospecting, ainda sem engage).
@@ -93,7 +144,7 @@ A coluna Score usa a chance só pela idade, como na simulação oficial. Com o f
 - **+5% contra o feeling, com menos da metade dos deals.** O Score ganha em 19 de 30 vendedores.
 - **A curva certa importa:** com a primeira versão da curva (que só aprendia com deals fechados), a receita seria $47,5 mil, abaixo do feeling.
 
-**Fator carga** (`analises/fator_carga.py`): quem tem menos deals abertos quando o deal começa ganha mais (+8,8, +7,8 e +6,2 pontos de taxa de ganho entre pouca e muita carga, em 3 datas de corte). Na simulação, ele não muda a receita (-0,04%), mas sobe o acerto semanal de 48,2% para 49,3% e a nota de ordenação de 0,652 para 0,667 (0,5 é cara ou coroa). Entrou no app como ajuste fino da chance.
+**Fator carga** (`analises/fator_carga.py`): passou no autoteste nas 3 janelas (+8,6, +9,8 e +8,3 pontos para quem tem pouca carga). Na simulação das segundas, ele não muda a receita (-0,04%), mas sobe o acerto semanal de 48,2% para 49,3% e a nota de ordenação de 0,652 para 0,667 (0,5 é cara ou coroa). Ou seja, deixa a lista mais certeira sem trocar os deals que mais valem.
 
 **O pipeline hoje** (31/12/2017): 2.089 deals abertos, $4,97 milhões a preço de tabela. 1.291 deles (62%, $3,2 milhões) estão abertos há mais de 138 dias, sem precedente de fechamento. 1.425 (68%) não têm conta cadastrada. 6 de 27 vendedores não têm nenhum deal para atacar ou fechar rápido.
 
@@ -107,10 +158,10 @@ A coluna Score usa a chance só pela idade, como na simulação oficial. Com o f
 
 ### Limitações
 
-- **Base sintética:** só o tempo se sustentou no teste. O corte de 138 dias é desta base; num CRM real, a curva deve ser recalculada.
+- **Base sintética:** só o tempo e a carga do vendedor se sustentaram no teste. O corte de 138 dias é desta base; num CRM real, a curva deve ser recalculada.
 - **A simulação não mede causa:** supõe que dar atenção a um deal não muda a chance dele. Em 11 de 30 vendedores, o sorteio rendeu mais que o Score.
 - **O fator carga pode ser causalidade reversa:** vendedor bom fecha rápido, esvazia a carteira e aparece com "pouca carga". Não dá para separar isso com esta base.
-- **Faixas do fator carga:** o fator aprende com os tercis de carga dos deals fechados e é aplicado com os tercis dos deals abertos, que têm outros cortes. Alinhar os cortes é a próxima correção do `clima.py`.
+- **A carga é relativa ao time:** a faixa de cada deal depende da carga dos outros naquele momento (o fator aprende com os tercis dos deals fechados e é aplicado com os tercis dos abertos). Num CRM real, vale recalibrar os cortes a cada trimestre.
 - **68% dos deals abertos não têm conta:** o Raio X fica sem ficha para eles, e "sem conta" não pode virar sinal (na base, só deal aberto fica sem conta).
 - **Premissas configuráveis:** piso de 5% para deal sem precedente e chance do dia 0 para Prospecting.
 - **Fora desta versão:** visão do gerente, gravação da consulta médica e da pesquisa Win/Lost, envio automático da régua de nutrição e playbook personalizado por lead (o atual é por regra).
@@ -155,6 +206,7 @@ O log completo, sessão por sessão e com os erros da IA numerados, está em [`p
 ### O que eu adicionei que a IA sozinha não faria
 
 - **O olhar de quem vende:** a pergunta não é "qual deal tem a maior nota", é "o que eu faço na segunda de manhã". Por isso o rótulo de ação vem antes do número, a linguagem é de vendedor, cada selo traz uma dica para reverter e as ações de foco são verde e azul (vermelho só para alerta).
+- **O desenho do Clima do Deal:** os 7 sinais que eu uso para prever um fechamento e a correção de que o tempo é o ponto de partida, não mais um fator. A IA testou cada sinal; eu decidi o que entrava.
 - **Rejeitar a tela de gerente:** a primeira versão seguia o PRD com 6 abas e filtros. Testando como vendedor, vi que ela não respondia ao pedido da Head de RevOps e refiz a interface pelo vendedor.
 - **A metodologia do Alfredo Soares** no Raio X e no Playbook: consulta médica, matemática do 1% e régua de nutrição.
 - **Não inventar dado:** engajamento em redes sociais não existe na base, então virou recomendação para a v2, não um número fabricado.

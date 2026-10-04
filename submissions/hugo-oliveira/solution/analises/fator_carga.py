@@ -62,6 +62,38 @@ def fator_na_data(data):
     return np.maximum(taxa / ganhou.mean(), config.PISO_CHANCE), taxa
 
 
+def autoteste_da_carga(corte, fim, relativos: bool = False) -> pd.Series:
+    """Roda o autoteste oficial com a carga como mais um indicador (pouca, média, muita).
+
+    relativos=False: os cortes dos tercis vêm só do treino (deals fechados antes do corte).
+    relativos=True: treino e teste usam os próprios tercis, como o app faz (o fator
+    aprende com os tercis dos fechados e é aplicado com os tercis dos abertos).
+    """
+    indicadores_originais, lista_original = v.indicadores, v.INDICADORES
+
+    def tercis(c, referencia):
+        p33, p66 = np.percentile(c[referencia].dropna(), [33, 66])
+        return np.select([c <= p33, c <= p66], ["pouca", "média"], "muita")
+
+    def com_carga(base_, corte_):
+        d = indicadores_originais(base_, corte_)
+        inicio, final = pd.Timestamp(corte_), pd.Timestamp(fim)
+        treino = d["close_date"].notna() & (d["close_date"] < inicio)
+        teste = d["engage_date"].notna() & (d["engage_date"] >= inicio) & (d["engage_date"] <= final)
+        c = carga.reindex(d.index)
+        faixa = tercis(c, treino)
+        if relativos:
+            faixa = np.where(teste, tercis(c, teste), faixa)
+        d["carga"] = np.where(c.isna(), None, faixa)
+        return d
+
+    v.indicadores, v.INDICADORES = com_carga, tuple(lista_original) + ("carga",)
+    try:
+        return v.autoteste(base, corte, fim).loc["carga"]
+    finally:
+        v.indicadores, v.INDICADORES = indicadores_originais, lista_original
+
+
 retratos_originais = v.retratos_das_segundas
 
 
@@ -84,6 +116,18 @@ if __name__ == "__main__":
     diferenca = np.abs(confere["carga_pipeline"].to_numpy()
                        - carga_por_id.loc[confere["opportunity_id"]].to_numpy()).max()
     print(f"Carga igual à do app (diferença máxima): {diferenca:.0f}\n")
+
+    print("Autoteste oficial com a carga como indicador (aprende antes do corte, testa depois):")
+    janelas = [(config.AUTOTESTE_CORTE, config.AUTOTESTE_FIM),
+               ("2017-06-01", "2017-07-14"), ("2017-05-01", "2017-06-14")]
+    for relativos, nome in [(False, "cortes do treino"), (True, "tercis relativos, como no app")]:
+        print(f" {nome}:")
+        for corte, fim in janelas:
+            r = autoteste_da_carga(corte, fim, relativos)
+            print(f"  teste {pd.Timestamp(corte):%d/%m} a {pd.Timestamp(fim):%d/%m/%Y}: "
+                  f"grupo melhor = {r['grupos_melhores']}, diferença = {100 * r['diferenca']:+.1f} pontos, "
+                  f"casos {r['casos_melhores']}/{r['casos_outros']}, status = {r['status']}")
+    print()
 
     v.retratos_das_segundas = retratos_com_carga
     sim = v.simular_segundas(base)
