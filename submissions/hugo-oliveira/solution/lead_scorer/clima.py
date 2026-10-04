@@ -3,9 +3,12 @@
 Analogia: previsão do tempo. Olhamos o que aconteceu com deals da mesma idade
 e carga de trabalho no passado para dizer a chance deste.
 
-Sinais que resistiram ao teste temporal (autoteste em validacao.py):
-- Idade: +98% de poder preditivo (tábua de sobrevivência)
-- Carga de pipeline (deals abertos simultâneos): +15.7 pontos de diferença
+Sinais que passaram nos testes (python -m lead_scorer.validacao e
+python analises/fator_carga.py):
+- Idade: base da chance (tábua de sobrevivência). Nota de ordenação 0,65
+  contra 0,53 da curva da versão 1 (0,5 = sorteio).
+- Carga do vendedor (deals abertos no dia do engage), em tercis relativos:
+  +8,6, +9,8 e +8,3 pontos no autoteste, em 3 janelas.
 """
 from dataclasses import dataclass
 
@@ -101,8 +104,10 @@ def curva_prd(deals: pd.DataFrame, data_corte) -> Curva:
 def curva_carga(deals: pd.DataFrame, data_corte) -> Curva:
     """Fator multiplicativo por carga de pipeline do vendedor.
 
-    Carga = quantos deals o vendedor tinha abertos simultaneamente.
-    Testado em autoteste (validacao.py): +15.7 pontos de diferença (baixa vs alta).
+    Carga = quantos deals do mesmo vendedor estavam abertos no dia do engage.
+    Fator de cada tercil = taxa de ganho dos deals fechados até a data de corte
+    nesse tercil, dividida pela média. Autoteste em analises/fator_carga.py:
+    +8,6, +9,8 e +8,3 pontos em 3 janelas.
     
     Retorna fator para 3 faixas: 0=baixa, 1=média, 2=alta.
     """
