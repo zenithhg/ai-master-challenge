@@ -9,7 +9,7 @@ def test_curva_corrigida(base):
     esperado = {0: 0.519, 14: 0.501, 30: 0.486, 60: 0.463, 90: 0.349, 120: 0.095}
     for idade, chance in esperado.items():
         assert curva([idade])[0] == pytest.approx(chance, abs=0.002), idade
-    assert curva.ultimo_dia == 138
+    assert curva.maximo == 138
     assert curva([130])[0] == pytest.approx(0.05)   # piso
     assert curva([500])[0] == pytest.approx(0.05)   # sem precedente
 

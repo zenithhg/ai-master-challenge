@@ -1,7 +1,7 @@
-"""App do Lead Scorer — tela do vendedor: Missão do dia, Raio X e Playbook.
+"""App do Lead Scorer: tela do vendedor (Missão do dia, Raio X e Playbook).
 
-A visão de gerente (Time, Validação, Minha conversão) foi movida para
-app_gerente_backup.py até entrarmos nela de novo.
+Rodar: streamlit run app.py (dentro da pasta solution/).
+Visão de gerente fica fora do escopo desta entrega (ver README).
 """
 import sys
 from pathlib import Path
@@ -23,7 +23,7 @@ st.set_page_config(
     page_title="Lead Scorer",
     page_icon="🎯",
     layout="wide",
-    initial_sidebar_state="collapsed",
+    initial_sidebar_state="expanded",
 )
 
 # ─── Linguagem simples e cor por rótulo (não muda o nome do rótulo em si) ──────
@@ -43,6 +43,21 @@ EMOJI = {
 }
 
 ABERTO_POR_PADRAO = {ATACAR, FECHAR}
+
+
+def inteiro(n) -> str:
+    """Número inteiro no formato brasileiro: 2089 -> "2.089"."""
+    return f"{int(n):,}".replace(",", ".")
+
+
+def decimal(x, casas: int = 1) -> str:
+    """Decimal no formato brasileiro: 1223.6 -> "1.223,6"."""
+    return f"{x:,.{casas}f}".replace(",", "§").replace(".", ",").replace("§", ".")
+
+
+def sem_formula(texto: str) -> str:
+    """Escapa o $: dois valores em dólar no mesmo texto viram fórmula no Streamlit."""
+    return texto.replace("$", "\\$")
 
 
 # ─── Cache ────────────────────────────────────────────────────────────────────
@@ -87,12 +102,15 @@ def voltar_para_lista() -> None:
 # ─── Sidebar: só a troca de vendedor ────────────────────────────────────────────
 
 vendedores = sorted(pontuados["sales_agent"].dropna().unique().tolist())
+# Abre no vendedor com mais negócios em foco: a primeira tela já mostra a ferramenta em uso.
+em_foco = pontuados.loc[pontuados["rotulo"].isin(score.FOCO), "sales_agent"].value_counts()
+padrao = vendedores.index(em_foco.idxmax()) if not em_foco.empty else 0
 
 with st.sidebar:
     st.title("🎯 Lead Scorer")
-    vendedor = st.selectbox("Ver como vendedor", vendedores)
+    vendedor = st.selectbox("Ver como vendedor", vendedores, index=padrao)
     st.caption(f"Referência: {base.data_ref.strftime('%d/%m/%Y')}")
-    st.caption(f"Deals abertos (todo o time): {len(pontuados):,}")
+    st.caption(f"Deals abertos (todo o time): {inteiro(len(pontuados))}")
 
 meus = pontuados[pontuados["sales_agent"] == vendedor]
 
@@ -103,8 +121,8 @@ meus = pontuados[pontuados["sales_agent"] == vendedor]
 def tela_lista() -> None:
     st.header("🎯 Missão do dia")
     st.caption(
-        "Seus negócios abertos, do maior Score para o menor. "
-        "Clique em qualquer um para ver o Raio X e o Playbook."
+        f"Negócios abertos de {vendedor}, do maior Score para o menor. "
+        "Clique em \"Ver\" para abrir o Raio X e o Playbook do negócio."
     )
 
     foco_vendedor = meus[meus["rotulo"].isin(score.FOCO)]
@@ -125,7 +143,7 @@ def tela_lista() -> None:
             continue
 
         titulo = (
-            f"{EMOJI[rotulo]} {rotulo} ({len(grupo)}) — {SUBTITULO[rotulo]}"
+            f"{EMOJI[rotulo]} {rotulo} ({len(grupo)}) · {SUBTITULO[rotulo]}"
         )
         with st.expander(titulo, expanded=(rotulo in ABERTO_POR_PADRAO)):
             st.caption(f"Valor total do grupo: {dinheiro(grupo['valor'].sum())}")
@@ -142,7 +160,7 @@ def tela_lista() -> None:
                 col_score, col_conta, col_chance, col_valor, col_acao = st.columns(
                     [1, 4, 2, 2, 1.4]
                 )
-                col_score.markdown(f"**{row['score']}**")
+                col_score.markdown(f"Score  \n**{row['score']}**")
                 col_conta.markdown(f"**{conta}{selos}**  \n{row['product']}")
                 col_chance.markdown(f"Chance: {porcento(row['chance'])}")
                 col_valor.markdown(f"Vale: {dinheiro(row['valor'])}")
@@ -176,14 +194,14 @@ def tela_detalhe(opportunity_id: str) -> None:
     if row["selo_sem_cadastro"]:
         badges.append("⚠️ Sem cadastro")
 
-    st.subheader(f"{row['score']} · {conta}")
+    st.subheader(f"Score {row['score']} · {conta}")
     st.caption(" · ".join(badges))
-    st.write(
+    st.write(sem_formula(
         f"{row['product']} · Vendedor {row['sales_agent']} · "
         f"{porcento(row['chance'])} de chance · Vale {dinheiro(row['valor'])} · "
         f"Valor esperado {dinheiro(row['valor_esperado'])}"
-    )
-    st.info(row["frase"])
+    ))
+    st.info(sem_formula(row["frase"]))
 
     raio = None
     if not row["selo_sem_cadastro"]:
@@ -201,7 +219,7 @@ def tela_detalhe(opportunity_id: str) -> None:
         st.markdown(f"#### Por que esse Score é {row['score']}?")
         st.caption(
             f"{row['score']} = o valor esperado deste negócio é maior que o de "
-            f"{row['score']}% dos {n_abertos:,} negócios abertos hoje."
+            f"{row['score']}% dos {inteiro(n_abertos)} negócios abertos hoje."
         )
         c1, c2 = st.columns(2)
         c1.metric("Chance de fechar", porcento(row["chance"]))
@@ -211,15 +229,15 @@ def tela_detalhe(opportunity_id: str) -> None:
             "mesma carga de trabalho do vendedor na época). Valor esperado = chance × valor."
         )
         st.caption(
-            "Analogia: o Score é a posição numa fila de atendimento — "
-            "quanto mais perto de 100, mais na frente."
+            "Analogia: o Score funciona como a posição numa fila de atendimento. "
+            "Quanto mais perto de 100, mais na frente."
         )
 
         st.divider()
 
         if row["selo_sem_cadastro"]:
             st.warning(
-                "⚠️ **Sem cadastro** — este negócio não tem conta vinculada, por isso "
+                "⚠️ **Sem cadastro:** este negócio não tem conta vinculada, por isso "
                 "não existe Raio X completo nem matemática do 1%.\n\n"
                 "**Dica para reverter:** peça CNPJ e nome da empresa na próxima "
                 "conversa e cadastre em até 7 dias, antes de investir mais tempo nele."
@@ -227,9 +245,9 @@ def tela_detalhe(opportunity_id: str) -> None:
         else:
             if row["selo_esfriando"]:
                 st.warning(
-                    "🌡️ **Esfriando** — última tentativa esta semana. Depois de 138 "
+                    "🌡️ **Esfriando:** última tentativa esta semana. Depois de 138 "
                     "dias, nenhuma venda da história fechou.\n\n"
-                    "**Dica para reverter:** ligue hoje com algo novo — uma notícia "
+                    "**Dica para reverter:** ligue hoje com algo novo: uma notícia "
                     "da empresa, um case, um convite. Não mande só \"retomando o contato\"."
                 )
 
@@ -240,7 +258,7 @@ def tela_detalhe(opportunity_id: str) -> None:
                 f = raio.ficha
                 st.markdown("#### Detalhe do cliente")
 
-                aprov = porcento(f.aproveitamento) if not np.isnan(f.aproveitamento) else "—"
+                aprov = porcento(f.aproveitamento) if not np.isnan(f.aproveitamento) else "sem histórico"
                 delta_aprov = (
                     f"{(f.aproveitamento - f.media_do_time) * 100:+.0f} pp vs. time"
                     if not np.isnan(f.aproveitamento) else None
@@ -255,8 +273,8 @@ def tela_detalhe(opportunity_id: str) -> None:
                 with col1:
                     st.markdown(f"**Setor:** {f.setor}")
                     st.markdown(f"**Porte:** {f.porte}")
-                    st.markdown(f"**Faturamento:** ${f.receita_milhoes:.1f} milhões/ano")
-                    st.markdown(f"**Funcionários:** {f.funcionarios:,}")
+                    st.markdown(f"**Faturamento:** ${decimal(f.receita_milhoes)} milhões/ano")
+                    st.markdown(f"**Funcionários:** {inteiro(f.funcionarios)}")
                     st.markdown(f"**Sede:** {f.sede}")
                 with col2:
                     if f.ultimos_5:
@@ -283,7 +301,7 @@ def tela_detalhe(opportunity_id: str) -> None:
                             "% das vitórias": (mix.values * 100).round(1),
                         }
                     )
-                    st.dataframe(mix_df, hide_index=True, use_container_width=False)
+                    st.dataframe(mix_df, hide_index=True)
                     if raio.ticket_do_porte:
                         st.caption(f"Ticket médio do porte: {dinheiro(raio.ticket_do_porte)}")
 
@@ -295,7 +313,7 @@ def tela_detalhe(opportunity_id: str) -> None:
 
     with tab_playbook:
         st.caption(
-            "Genérico v1 · por regra — não usa dado comportamental do lead "
+            "Genérico v1 · por regra: não usa dado comportamental do lead "
             "(veja a nota no fim)."
         )
 
@@ -317,10 +335,10 @@ def tela_detalhe(opportunity_id: str) -> None:
         else:
             st.info(
                 "Primeira negociação com esta conta. Pesquise a empresa antes de "
-                "ligar — uma notícia recente vale mais que \"oi, tudo bem\"."
+                "ligar: uma notícia recente vale mais que \"oi, tudo bem\"."
             )
 
-        st.markdown("##### 🩺 Consulta médica — 3 perguntas obrigatórias")
+        st.markdown("##### 🩺 Consulta médica: 3 perguntas obrigatórias")
         st.markdown(
             "1. Quais são os 3 maiores desafios de gestão hoje?  \n"
             "2. Há quanto tempo essas dores persistem?  \n"
