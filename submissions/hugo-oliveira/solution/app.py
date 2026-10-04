@@ -100,20 +100,44 @@ def voltar_para_lista() -> None:
     st.session_state.deal_id = None
 
 
-# ─── Sidebar: só a troca de vendedor ────────────────────────────────────────────
+# ─── Sidebar: filtros em cascata (região → gerente → vendedor) ──────────────────
 
-vendedores = sorted(pontuados["sales_agent"].dropna().unique().tolist())
-# Abre no vendedor com mais negócios em foco: a primeira tela já mostra a ferramenta em uso.
-em_foco = pontuados.loc[pontuados["rotulo"].isin(score.FOCO), "sales_agent"].value_counts()
-padrao = vendedores.index(em_foco.idxmax()) if not em_foco.empty else 0
+TODAS, TODOS = "Todas", "Todos"
+
+
+def vendedor_com_mais_foco(df: pd.DataFrame):
+    em_foco = df.loc[df["rotulo"].isin(score.FOCO), "sales_agent"].value_counts()
+    return em_foco.idxmax() if not em_foco.empty else None
+
 
 with st.sidebar:
     st.title("🎯 Lead Scorer")
-    vendedor = st.selectbox("Ver como vendedor", vendedores, index=padrao)
+    regiao = st.selectbox("Região", [TODAS] + sorted(pontuados["regional_office"].dropna().unique()))
+    filtrados = pontuados if regiao == TODAS else pontuados[pontuados["regional_office"] == regiao]
+    gerente = st.selectbox("Gerente", [TODOS] + sorted(filtrados["manager"].dropna().unique()))
+    if gerente != TODOS:
+        filtrados = filtrados[filtrados["manager"] == gerente]
+    vendedores = sorted(filtrados["sales_agent"].dropna().unique())
+    # Sem filtro, abre no vendedor com mais negócios em foco (a primeira tela já mostra
+    # a ferramenta em uso). Com região ou gerente escolhidos, abre na lista do time.
+    padrao = 0
+    destaque = vendedor_com_mais_foco(filtrados)
+    if regiao == TODAS and gerente == TODOS and destaque in vendedores:
+        padrao = vendedores.index(destaque) + 1
+    vendedor = st.selectbox("Vendedor", [TODOS] + vendedores, index=padrao)
     st.caption(f"Referência: {base.data_ref.strftime('%d/%m/%Y')}")
     st.caption(f"Deals abertos (todo o time): {inteiro(len(pontuados))}")
 
-meus = pontuados[pontuados["sales_agent"] == vendedor]
+varios_vendedores = vendedor == TODOS
+meus = filtrados if varios_vendedores else filtrados[filtrados["sales_agent"] == vendedor]
+if not varios_vendedores:
+    quem = vendedor
+elif gerente != TODOS:
+    quem = f"todo o time de {gerente}"
+elif regiao != TODAS:
+    quem = f"toda a região {regiao}"
+else:
+    quem = "todo o time"
 
 
 # ─── Tela 1: Missão do dia (lista) ───────────────────────────────────────────────
@@ -122,7 +146,7 @@ meus = pontuados[pontuados["sales_agent"] == vendedor]
 def tela_lista() -> None:
     st.header("🎯 Missão do dia")
     st.caption(
-        f"Negócios abertos de {vendedor}, do maior Score para o menor. "
+        f"Negócios abertos de {quem}, do maior Score para o menor. "
         "Clique em \"Ver\" para abrir o Raio X e o Playbook do negócio."
     )
 
@@ -135,7 +159,7 @@ def tela_lista() -> None:
     st.divider()
 
     if meus.empty:
-        st.info("Nenhum negócio aberto para este vendedor.")
+        st.info("Nenhum negócio aberto para esta seleção.")
         return
 
     for rotulo in ROTULOS:
@@ -162,7 +186,8 @@ def tela_lista() -> None:
                     [1, 4, 2, 2, 1.4]
                 )
                 col_score.markdown(f"Score  \n**{row['score']}**")
-                col_conta.markdown(f"**{conta}{selos}**  \n{row['product']}")
+                detalhe = f"{row['product']} · {row['sales_agent']}" if varios_vendedores else row["product"]
+                col_conta.markdown(f"**{conta}{selos}**  \n{detalhe}")
                 col_chance.markdown(f"Chance: {porcento(row['chance'])}")
                 col_valor.markdown(f"Vale: {dinheiro(row['valor'])}")
                 if col_acao.button("Ver →", key=f"ver_{row['opportunity_id']}"):
