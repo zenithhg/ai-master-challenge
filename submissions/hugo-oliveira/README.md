@@ -1,216 +1,172 @@
-# Clima Deal: Lead Scorer para Vendas
+# Submissão — Hugo Oliveira — Challenge 003
 
-**Challenge:** G4 AI Master 003 - Lead Scorer para Sales/RevOps  
-**Deadline:** 06/10/2026  
-**Submitter:** Hugo Oliveira (Zenith Inc)
+## Sobre mim
 
----
-
-## Resumo Executivo
-
-**Clima Deal** é um algoritmo probabilístico que complementa o Lead Score tradicional respondendo: *"Qual é a chance real deste deal fechar?"*
-
-O Score já responde "*Este deal vale mais*" (ranking por expected value). O Clima responde "*Temos chance de ganhar este deal*" (probabilidade de fechamento).
-
-**Resultado:** v1 usa 2 fatores validados e melhora a receita esperada em **+$90k** sobre modelo baseado apenas em idade.
+- **Nome:** Hugo Oliveira
+- **LinkedIn:** _(a preencher)_
+- **Challenge escolhido:** 003, Lead Scorer (Vendas / RevOps)
 
 ---
 
-## Abordagem Técnica
+## Executive Summary
 
-### O Algoritmo: Uma "Previsão do Tempo" de Vendas
-
-Assim como meteorologia combina múltiplos sinais (temperatura, umidade, pressão) para prever chuva, Clima Deal combina múltiplos sinais de vendas para prever fechamento.
-
-```
-CHANCE_FINAL = CHANCE_BASE(idade) × FATOR_CARGA(pipeline) 
-Clipped to [5%, 95%]
-```
-
-### 1. CHANCE_BASE: Idade do Deal
-
-**O que é:** Probabilidade de fechar baseado em quanto tempo leva um deal na fase atual (tábua de sobrevivência com riscos concorrentes).
-
-**Por que funciona:** Deals muito novos raramente fecham rápido; deals muito antigos frequentemente não fecham nunca. A curva captura ambos os riscos.
-
-**Método:** 
-- Conta deals que ganharam, perderam e ainda estão abertos
-- Computa probabilidade de ganho acumulativa por dias em aberto
-- Trata perdas como risco concorrente (não ignora falhas)
-
-**Resultado:** Explica ~98% do poder preditivo; baseline forte.
-
-### 2. FATOR_CARGA: Carga de Pipeline do Vendedor
-
-**O que é:** Multiplicador baseado em quantos deals o vendedor tem abertos simultaneamente.
-
-**Intuição:** Vendedores com low-load convertem mais (mais foco). Vendedores com high-load convertem menos (disperso).
-
-**Método:**
-- Calcula quantos deals cada vendedor tinha abertos quando o deal atual foi engajado
-- Discretiza em tercis (baixa, média, alta)
-- Computa win rate por tercil
-- Normaliza vs. win rate médio = fator multiplicativo
-
-**Validação:** Testado com temporal split (treinado em passado, validado em futuro):
-- Ganho: +15.7 pontos de diferença entre tercis
-- Robustez: Mantém +15.7 em 3 janelas temporais diferentes
-- Não é artefato: Causalidade reversa improvável (bons vendedores não "parecem" low-load causalmente)
+Construí um app em Streamlit que o vendedor abre na segunda de manhã e vê, numa tela só, os negócios dele separados pela próxima ação ("Atacar agora", "Fechar rápido", "Qualificar em 14 dias"...), cada um com Score de 0 a 100, chance de fechar e uma frase que explica o número. O achado que guiou o projeto: nesta base, o perfil do cliente (setor, porte, região) não prevê se o deal fecha; o tempo prevê. Nenhuma venda da base fechou depois de 138 dias aberta, e hoje 1.291 dos 2.089 deals abertos já passaram disso ($3,2 milhões parados). Numa simulação de 16 segundas com 30 vendedores, escolher os deals da semana pelo Score rendeu 52,5% mais receita do que perseguir o maior valor e 5% mais que o feeling, com menos da metade dos deals. Recomendo um piloto de 30 dias com metade do time para medir o efeito real.
 
 ---
 
-## Resultados
+## Solução
 
-### Simulação em Dados Existentes
+![Missão do dia: a lista do vendedor](docs/screenshots/01-missao-do-dia.png)
 
-| Métrica | Baseline (v1: só idade) | Clima v2 (idade + carga) | Melhoria |
-|---------|-------------|-----------|----------|
-| **Receita esperada** | ~$1.72M | **$1.81M** | **+$90k** (+5.3%) |
-| **Acurácia (hit rate)** | 48.0% | 48.2% | +0.2pp |
-| **Vs "feeling"** | +5.0% | +5.3% | +0.3pp |
-| **Vendedores onde clima ganha** | — | 26/30 | 87% |
+### Como rodar
 
-### Exemplo: Deal com Impacto do Fator Carga
-
-```
-Account: Betasoloin
-Idade: 42 dias
-Carga pipeline: 8 deals abertos (tercil alto)
-
-CHANCE_BASE(42 dias): 68%
-FATOR_CARGA(alto): 0.92x (high-load vendedor conversa menos)
-CHANCE_FINAL: 68% × 0.92 = 63%
-
-→ Foca em deals com mais chance. Melhor alocação de tempo.
-```
-
----
-
-## Limitações Conhecidas
-
-### v1 (Atual)
-1. **Causalidade reversa potencial em carga:** Não é claro se low-load → melhor conversão, ou se bons vendedores "limpam" rápido → parecem low-load. Dataset sintético complica validação.
-2. **Apenas dados da pipeline:** Faltam sinais reais de vendas (engagement do cliente, NPS, histórico de suporte).
-3. **Base sintética:** Dados 2015-2017 podem não representar padrão 2024.
-
-### Sugestões para v2
-- **Social engagement:** Quantas vezes o cliente se engajou (emails, calls, demos)
-- **NPS histórico:** Score de satisfação em contas anteriores do vendedor
-- **Suporte pré-venda:** Tempo de resposta, qualidade de proposta
-- **Tamanho relativo:** Deal grande vs. ACV do vendedor (pode indicar vendedor em desenvolvimento)
-- **Recência:** Deals recentes convertem diferente de antigos (market conditions)
-
----
-
-## Como Usar
-
-### 1. Importar e aplicar em deals abertos hoje
-
-```python
-from solution.lead_scorer.clima import aplicar
-from solution.app import BaseDados
-
-base = BaseDados()  # Carrega deals + accounts + teams
-clima_hoje = aplicar(base)  # Aplica Clima Deal aos deals abertos hoje
-
-# Saídas
-print(clima_hoje[['account', 'estado', 'chance', 'fator_carga']])
-```
-
-### 2. Outputs por deal
-
-- `idade`: dias desde engajamento
-- `chance_base`: probabilidade só pela idade
-- `carga_pipeline`: número de deals abertos simultâneos
-- `faixa_carga`: tercil (0=baixa, 1=média, 2=alta)
-- `fator_carga`: multiplicador (1.0 = média)
-- `chance`: probabilidade final [5%, 95%]
-- `estado`: fase (novo, ativo, esfriando, sem precedente)
-- `selo_esfriando`: True se estado == ESFRIANDO
-
-### 3. Validação: Rodar autotest temporal
+Requer Python 3.10 ou mais recente. Os dados do dataset (licença CC0) já estão em `solution/data/`.
 
 ```bash
-cd solution
-python3 -m pytest tests/ -v
+cd submissions/hugo-oliveira/solution
+pip install -r requirements.txt
+streamlit run app.py
 ```
 
-Ou manualmente:
-```python
-from lead_scorer.validacao import autoteste
-autoteste()  # Testa com split temporal (train/val/test)
+Abre em http://localhost:8501. A primeira carga leva alguns segundos (cerca de 10 num notebook), porque calcula o pipeline inteiro; depois fica em cache. Na barra lateral, "Ver como vendedor" troca o vendedor; o app abre no que tem mais negócios em foco.
+
+Para conferir os números deste README:
+
+```bash
+pytest                              # 34 testes das regras
+python -m lead_scorer.validacao     # simulação das segundas e autoteste dos sinais
+python analises/fator_carga.py      # efeito do fator carga
 ```
 
+### Abordagem
+
+1. **Dados antes do modelo.** Testei se o perfil do cliente separa ganho de perda: setor, porte, funcionários, sede, grupo, histórico da conta e do vendedor. Cada sinal passou por um autoteste temporal: aprende com o que fechou antes de 01/07/2017 e é testado nos deals que começaram depois. Nenhum sinal de perfil passou. O tempo desde o engage passou.
+2. **Clima do Deal.** Transformei o tempo em chance com uma tábua de sobrevivência: para cada idade, quantos deals que chegaram até ali terminaram ganhos. A curva conta também os deals que continuam abertos; sem isso, ela conclui que deal velho é bom (foi o erro da primeira versão).
+3. **Score e ação.** Score = chance × valor, em percentil, para ordenar a fila. O rótulo diz o que fazer com cada deal.
+4. **Validação.** Simulei 16 segundas: em cada uma, cada vendedor escolhe 5 deals para a semana por três critérios (Score, maior valor e sorteio), sem olhar o futuro.
+5. **Tela pelo vendedor.** Mockup clicável primeiro, ajustado com o meu olhar de KAM, depois o código.
+
+### Como o Score funciona
+
+- **Chance de fechar (Clima do Deal):** probabilidade de um deal com essa idade terminar ganho, vinda da tábua de sobrevivência e ajustada pela carga do vendedor (quantos deals ele tinha abertos quando o deal começou; quem está sobrecarregado fecha menos).
+- **Valor esperado:** chance × preço de tabela do produto.
+- **Score (0 a 100):** posição do valor esperado entre os 2.089 deals abertos. Score 90 = valor esperado maior que o de 90% do pipeline.
+- **Estados pelo tempo desde o engage:** novo (0 a 14 dias), ativo (15 a 90), esfriando (91 a 138, com o selo "última tentativa esta semana"), sem precedente (mais de 138: nenhuma venda da base fechou depois disso) e a qualificar (Prospecting, ainda sem engage).
+
+| Rótulo | Regra | Abertos | O que fazer |
+|---|---|---|---|
+| Atacar agora | Ativo ou esfriando, produto de $3.393 ou mais | 120 | Consulta médica e proposta |
+| Fechar rápido | Ativo ou esfriando, produto mais barato | 171 | Fechar com esforço mínimo |
+| Qualificar em 14 dias | Prospecting ou novo | 507 | Consulta médica em até 14 dias |
+| Nutrição de elite | Sem precedente, com conta, valor alto | 180 | Régua de 90 dias com o vendedor |
+| Limpar ou automação | Sem precedente, com conta, valor baixo | 232 | Régua automática ou fechar como Lost |
+| Completar cadastro ou limpar | Sem precedente, sem conta | 879 | Completar o cadastro em 7 dias ou fechar |
+
+Os parâmetros (data de referência 31/12/2017, limites de dias, piso de 5%, valor alto) ficam em `solution/config.py`. O desenho completo está em [`docs/PRD.md`](docs/PRD.md).
+
+### O que o vendedor vê
+
+1. **Missão do dia** (print acima): os negócios do vendedor agrupados pela ação, do maior Score para o menor. "Atacar agora" e "Fechar rápido" abrem no topo; os selos 🌡️ esfriando e ⚠️ sem cadastro aparecem na linha.
+2. **Detalhe do lead, aba Raio X:** o porquê do Score em linguagem simples, a chance e o valor esperado, a dica para reverter cada selo, a ficha da conta (negociações, vitórias, aproveitamento contra o time, últimos 5 resultados, produto mais comprado), o que contas do mesmo porte compram e a matemática do 1% (o preço cabe no faturamento do cliente?).
+3. **Aba Playbook:** abertura sugerida pelo histórico da conta, as 3 perguntas da consulta médica, a matemática do 1% e a contraobjeção do momento, com base na metodologia de vendas do Alfredo Soares.
+
+| Raio X | Playbook |
+|---|---|
+| ![Raio X do lead](docs/screenshots/02-raio-x.png) | ![Playbook do lead](docs/screenshots/03-playbook.png) |
+
+Selos com dica para reverter: [esfriando](docs/screenshots/04-esfriando.png) e [sem cadastro e esfriando](docs/screenshots/05-sem-cadastro.png).
+
+### Resultados / Findings
+
+**Simulação das segundas** (16 segundas de maio a agosto de 2017, 30 vendedores, 5 deals por semana; o resultado de cada deal é conferido até 31/12/2017 e cada deal conta uma vez na receita). Vendedor médio:
+
+| | Feeling (sorteio) | Maior valor | Score (Clima) |
+|---|---|---|---|
+| Semanas de foco em deal que terminou ganho | 43% | 40% | **48%** |
+| Tempo em deal que nunca fechou | 36% | 41% | **31%** |
+| Deals trabalhados em 16 semanas | 54 | 14 | 23 |
+| Receita dos deals trabalhados | $57,3 mil | $39,6 mil | **$60,3 mil** |
+
+- **+52,5% de receita contra quem persegue o maior valor.** O Score ganha em 26 de 30 vendedores.
+- **+5% contra o feeling, com menos da metade dos deals.** O Score ganha em 19 de 30 vendedores.
+- **A curva certa importa:** com a primeira versão da curva (que só aprendia com deals fechados), a receita seria $47,5 mil, abaixo do feeling.
+
+**Fator carga** (`analises/fator_carga.py`): quem tem menos deals abertos quando o deal começa ganha mais (+8,8, +7,8 e +6,2 pontos de taxa de ganho entre pouca e muita carga, em 3 datas de corte). Na simulação, ele não muda a receita (-0,04%), mas sobe o acerto semanal de 48,2% para 49,3% e a nota de ordenação de 0,652 para 0,667 (0,5 é cara ou coroa). Entrou no app como ajuste fino da chance.
+
+**O pipeline hoje** (31/12/2017): 2.089 deals abertos, $4,97 milhões a preço de tabela. 1.291 deles (62%, $3,2 milhões) estão abertos há mais de 138 dias, sem precedente de fechamento. 1.425 (68%) não têm conta cadastrada. 6 de 27 vendedores não têm nenhum deal para atacar ou fechar rápido.
+
+### Recomendações
+
+1. **Piloto de 30 dias** com metade do time usando a lista, medindo receita e horas. A simulação mede a qualidade da lista, não a causa; o piloto mede a causa.
+2. **Limpar o pipeline:** 879 deals sem conta e sem precedente ($2,13 milhões) poluem a carteira. Completar o cadastro em 7 dias ou fechar como Lost.
+3. **Pesquisa Win/Lost** com 5 perguntas obrigatórias ao fechar (motivo, objeção, decisor, concorrente, origem do lead), para alimentar o autoteste e substituir o piso de 5%.
+4. **Dados comportamentais na v2 do score:** engajamento, conteúdo consumido e nível de consciência do lead (pedidos pela metodologia do Alfredo Soares) não existem nesta base. Com eles, o score ganha uma dimensão de prontidão.
+5. **Visão do gerente:** região e gerente passaram no autoteste (+16 e +10 pontos), mas são iguais para todos os deals de um vendedor e não mudam a lista dele. Servem a um painel de gerente, fora desta entrega.
+
+### Limitações
+
+- **Base sintética:** só o tempo se sustentou no teste. O corte de 138 dias é desta base; num CRM real, a curva deve ser recalculada.
+- **A simulação não mede causa:** supõe que dar atenção a um deal não muda a chance dele. Em 11 de 30 vendedores, o sorteio rendeu mais que o Score.
+- **O fator carga pode ser causalidade reversa:** vendedor bom fecha rápido, esvazia a carteira e aparece com "pouca carga". Não dá para separar isso com esta base.
+- **68% dos deals abertos não têm conta:** o Raio X fica sem ficha para eles, e "sem conta" não pode virar sinal (na base, só deal aberto fica sem conta).
+- **Premissas configuráveis:** piso de 5% para deal sem precedente e chance do dia 0 para Prospecting.
+- **Fora desta versão:** visão do gerente, gravação da consulta médica e da pesquisa Win/Lost, envio automático da régua de nutrição e playbook personalizado por lead (o atual é por regra).
+- **Desempenho:** a carga de cada deal é calculada com laços em Python; para um CRM maior, o cálculo precisa ser vetorizado.
+
 ---
 
-## Arquitetura
+## Process Log — Como usei IA
 
-```
-solution/
-├── config.py                 # Constantes (PISO_CHANCE, LIMITE_NOVO, etc)
-├── lead_scorer/
-│   ├── clima.py             # Algoritmo principal
-│   │   ├── Curva            # Dataclass: mapeamento (valor → chance)
-│   │   ├── curva_corrigida()   # CHANCE_BASE via tábua sobrevivência
-│   │   ├── curva_carga()       # FATOR_CARGA via tercis
-│   │   └── aplicar()           # Aplica a ambos os deals
-│   └── validacao.py         # Autotest com temporal split
-├── data/
-│   ├── sales_pipeline.csv   # 8.8k deals (opportunity_id, stage, dates)
-│   ├── accounts.csv         # 85 contas (setor, funcionários, etc)
-│   └── sales_teams.csv      # 35 vendedores (gerente, escritório)
-├── docs/
-│   └── clima-deal-algoritmo.md  # Documentação técnica completa
-└── README.md                # Este arquivo
-```
+O log completo, sessão por sessão e com os erros da IA numerados, está em [`process-log/README.md`](process-log/README.md).
 
----
+### Ferramentas usadas
 
-## Próximos Passos
+| Ferramenta | Para que usei |
+|---|---|
+| Claude (chat com acesso aos dados, ao Mac, ao Notion e ao Todoist) | Raio-x dos CSVs, teste das hipóteses, PRD, plano em fases, simulação das segundas, cronograma |
+| Claude Code (local, Sonnet) | Fases 1 a 3 do código e revisão independente antes de cada commit |
+| Claude no app desktop (com acesso ao Mac) | Mockup clicável da tela do vendedor, construção do app, auditoria final, prints e este README |
 
-1. **Implementação:** Integrar ao APEX (dashboard Raio X mostrando Clima para cada deal)
-2. **Captura de sinais v2:** Coletar engagement, NPS, histórico de suporte
-3. **Recalibração:** Testar em dados 2024 após 3-6 meses de uso
-4. **Alertas:** "Deal esfriando + low-chance" → notificar vendedor para ação
+### Workflow
 
----
+1. Li o desafio e escolhi o 003 pelo encaixe com a minha experiência de KAM B2B priorizando carteira.
+2. Pedi um raio-x dos dados e testei a minha tese de vendedor (prever os deals abertos pelos que já fecharam) antes de pedir código.
+3. Com a IA, escrevi o PRD e um plano em 7 fases, com a regra "a IA propõe, eu aprovo".
+4. Validei a lógica com a simulação das segundas antes de construir a interface. Ela derrubou a primeira curva.
+5. Código em fases pequenas, com testes e revisão independente no Claude Code antes de cada commit.
+6. Testei o app como vendedor, rejeitei a tela de gerente e refiz a interface a partir de um mockup.
+7. Auditoria final: rodei a validação, conferi cada número deste README no código e instalei tudo do zero numa máquina limpa.
 
-## Decisões de Engenharia
+### Onde a IA errou e como corrigi
 
-### Por que Multiplicativo?
-- Simples: fácil de explicar ao vendedor
-- Interpretável: cada fator tem efeito claro
-- Robusto: não assume independência dos fatores (ok se correlacionados)
+| Erro da IA | Como percebi | Correção |
+|---|---|---|
+| A primeira curva só aprendia com deals fechados e dizia que deal velho era o melhor (76% aos 120 dias) | Simulação das segundas: de 91 a 138 dias, só 21% ganharam | Curva que conta também os abertos (tábua de sobrevivência) |
+| O A/B somava o mesmo deal várias vezes na receita | Conferindo a conta | Cada deal conta uma vez: +5% contra o feeling, +52,5% contra o maior valor |
+| O Raio X usaria vitórias do futuro com outra data de referência | Revisão independente no Claude Code | Filtro pela data de referência e 2 testes novos |
+| Citou um Score e um preço de produto sem rodar os dados | Desconfiei da explicação e cobrei a conferência na base | Regra nova: nenhum número sem rodar o código |
+| Achou fatores (vendedor, setor, conta) com treino e teste misturados no tempo | O autoteste do projeto derrubou os três, dois com o sinal invertido | Só entra sinal que passa no autoteste |
+| Reescreveu o `clima.py` inteiro e quebrou 1 teste; o README que escreveu tinha números que o código não reproduz | Auditoria final rodando `pytest` e a simulação | Teste corrigido, README refeito só com números reproduzíveis, teste do fator carga versionado |
+| Commitou um arquivo de configuração local fora da pasta da submissão | Auditoria contra o CONTRIBUTING | Removido do git antes do PR |
 
-### Por que Tercis (não contínuo)?
-- Mais estável: distribuição dos tercis é fixa
-- Menos overfitting: não ajusta para cada valor específico de carga
-- Operacional: "low, medium, high" é linguagem que vendedor entende
+### O que eu adicionei que a IA sozinha não faria
 
-### Por que Clipping [5%, 95%]?
-- 5% min: nenhum deal é impossível (risco operacional)
-- 95% max: nenhum deal é garantido (sempre há risco)
+- **O olhar de quem vende:** a pergunta não é "qual deal tem a maior nota", é "o que eu faço na segunda de manhã". Por isso o rótulo de ação vem antes do número, a linguagem é de vendedor, cada selo traz uma dica para reverter e as ações de foco são verde e azul (vermelho só para alerta).
+- **Rejeitar a tela de gerente:** a primeira versão seguia o PRD com 6 abas e filtros. Testando como vendedor, vi que ela não respondia ao pedido da Head de RevOps e refiz a interface pelo vendedor.
+- **A metodologia do Alfredo Soares** no Raio X e no Playbook: consulta médica, matemática do 1% e régua de nutrição.
+- **Não inventar dado:** engajamento em redes sociais não existe na base, então virou recomendação para a v2, não um número fabricado.
+- **Desconfiar de resultado bom demais:** exigi a simulação e o autoteste antes de aceitar qualquer sinal novo, e uma auditoria antes de abrir o PR.
 
 ---
 
-## Resultados Comparativos (Simulação)
+## Evidências
 
-Comparada com 3 estratégias de seleção:
-
-| Estratégia | Receita | Acurácia | Diferença vs Clima |
-|------------|---------|----------|-----------|
-| **Feeling** (vendedor escolhe) | $1.72M | 48% | -5.3% |
-| **Maior Valor** (rank por $) | $1.19M | 38% | -52.5% |
-| **Maior Chance** (rank por chance) | $1.78M | 48% | -1.5% |
-| **Clima Deal** (rank por value × chance) | **$1.81M** | **48%** | **Baseline** |
-
-Clima vence em 26/30 vendedores (87% das vendas).
+- [x] Screenshots do app: [`docs/screenshots/`](docs/screenshots/)
+- [ ] Screen recording do workflow
+- [ ] Chat exports
+- [x] Git history: commits pequenos e descritivos na branch `submission/hugo-oliveira`
+- [x] Outro: narrativa por sessão em [`process-log/README.md`](process-log/README.md), prompt de uma das tarefas em [`process-log/prompts/`](process-log/prompts/) e documento de requisitos em [`docs/PRD.md`](docs/PRD.md)
 
 ---
 
-## Attribution
-
-**Algoritmo:** Hugo Oliveira (Zenith Inc)  
-**Implementação:** Claude Haiku 4.5  
-**Dataset:** G4 AI Master Challenge 003  
-**Data:** Oct 2026
+_Submissão enviada em: (a preencher no dia do PR)_
