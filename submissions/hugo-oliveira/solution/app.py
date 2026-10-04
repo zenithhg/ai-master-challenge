@@ -29,10 +29,10 @@ st.set_page_config(
 # ─── Linguagem simples e cor por rótulo (não muda o nome do rótulo em si) ──────
 
 SUBTITULO = {
-    ATACAR: "Boa chance de fechar e vale bastante: ligue primeiro",
-    FECHAR: "Fácil de fechar: não deixe esfriar",
+    ATACAR: "Vale bastante e ainda está no prazo de fechar: ligue primeiro",
+    FECHAR: "Vale menos e ainda está no prazo: feche com esforço mínimo",
     QUALIFICAR: "Ainda não sabemos se vale a pena: descubra em até 2 semanas",
-    NUTRICAO: "Vale muito, mas ainda não está pronto para comprar: mantenha contato",
+    NUTRICAO: "Vale muito, mas passou do prazo normal de fechamento: mantenha contato",
     LIMPAR: "Vale pouco e já esfriou: não gaste tempo aqui",
     CADASTRO: "Falta o cadastro da empresa: complete ou descarte",
 }
