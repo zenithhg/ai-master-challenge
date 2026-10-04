@@ -237,4 +237,4 @@ O log completo, sessão por sessão e com os erros da IA numerados, está em [`p
 
 ---
 
-_Submissão enviada em: (a preencher no dia do PR)_
+_Submissão enviada em: 04/10/2026_
