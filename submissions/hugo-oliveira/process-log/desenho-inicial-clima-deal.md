@@ -1,4 +1,4 @@
-> **Rascunho histórico, abortado em 03/10/2026.** Este foi o primeiro desenho do Clima do Deal, com 4 fatores além da idade. No autoteste, vendedor, setor e conta inverteram o sinal e a fórmula foi abandonada. Os exemplos com nomes (João, TechCorp) são ilustrativos, não saem dos dados. O algoritmo final, com os números reproduzíveis, está na seção "O algoritmo: Clima do Deal" do [README](../README.md).
+> **Rascunho histórico de 03/10/2026.** Este foi o primeiro desenho do Clima do Deal, com 4 fatores além da idade. No autoteste, vendedor, setor e conta inverteram o sinal e saíram; região é igual para toda a carteira do vendedor e também saiu. O modelo final (idade × carga do vendedor) passou no teste. Os exemplos com nomes (João, TechCorp) são ilustrativos, não saem dos dados. O algoritmo final, com os números reproduzíveis, está na seção "O algoritmo: Clima do Deal" do [README](../README.md).
 
 # Clima Deal: Documentação do Algoritmo v1
 

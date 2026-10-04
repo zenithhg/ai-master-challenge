@@ -49,7 +49,7 @@ python analises/impacto.py          # impacto por mês e por ano
 
 ### O algoritmo: Clima do Deal
 
-O Score responde "qual deal atacar primeiro". O Clima do Deal responde a pergunta que vem antes: "qual a chance real de este deal fechar?". A ideia é a da previsão do tempo, que junta vários sinais (temperatura, umidade, vento) numa chance de chuva. Aqui, cada sinal só entra se provar nos dados que ajuda a prever.
+O Score responde "qual deal atacar primeiro". O Clima do Deal responde a pergunta que vem antes: "qual a chance real de este deal fechar?". A ideia é a da previsão do tempo, que junta vários sinais (temperatura, umidade, vento) numa chance de chuva. Aqui, cada sinal só entra se provar nos dados que ajuda a prever. **O modelo final, idade do deal × carga do vendedor, passou nesse teste e é o que o app usa.**
 
 **O desenho de partida.** Listei os 7 parâmetros que eu, como vendedor, usaria para prever um fechamento: tempo em aberto, faturamento, segmento, histórico de compra, engajamento em redes sociais, localização e vendedor. Engajamento não existe na base e foi para a v2. Com os outros, a primeira fórmula foi multiplicativa:
 
@@ -59,7 +59,7 @@ CHANCE = CHANCE_BASE(idade) × FATOR_VENDEDOR × FATOR_SETOR × FATOR_CONTA × F
 
 Cada fator é a taxa de ganho do grupo dividida pela média: vendedor que ganha 10% acima da média vale 1,10. Uma correção minha no desenho: o tempo em aberto não é mais um fator, é o ponto de partida; colocá-lo de novo contaria o tempo duas vezes. O rascunho dessa versão está em [`process-log/desenho-inicial-clima-deal.md`](process-log/desenho-inicial-clima-deal.md).
 
-**Por que abortamos esse desenho.** A primeira simulação calculou os fatores com o resultado dos mesmos deals que avaliava, misturando passado e futuro, e deu um resultado bom demais. No autoteste do projeto, que aprende com o que fechou antes de 01/07/2017 e testa nos deals que começaram depois, vendedor, setor e conta inverteram o sinal: o grupo que era melhor no passado foi pior no futuro. Um fator que inverte piora a lista, então saiu.
+**O que o teste cortou.** A primeira simulação calculou os fatores com o resultado dos mesmos deals que avaliava, misturando passado e futuro, e deu um resultado bom demais. No autoteste do projeto, que aprende com o que fechou antes de 01/07/2017 e testa nos deals que começaram depois, vendedor, setor e conta inverteram o sinal: o grupo que era melhor no passado foi pior no futuro. Um fator que inverte piora a lista, então saiu. Região passou no teste, mas é igual para toda a carteira do vendedor e não muda a ordem da lista dele; ficou para o gerente.
 
 **O que cada parâmetro mostrou.** Um sinal liga com 5 pontos de diferença ou mais e 200 casos ou mais (`python -m lead_scorer.validacao` e `python analises/fator_carga.py`):
 
