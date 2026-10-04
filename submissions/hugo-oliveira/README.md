@@ -10,7 +10,7 @@
 
 ## Executive Summary
 
-Construí um app em Streamlit que o vendedor abre na segunda de manhã e vê, numa tela só, os negócios dele separados pela próxima ação ("Atacar agora", "Fechar rápido", "Qualificar em 14 dias"...), cada um com Score de 0 a 100, chance de fechar e uma frase que explica o número. O achado que guiou o projeto: nesta base, o perfil do cliente (setor, porte, região) não prevê se o deal fecha; o tempo prevê. Nenhuma venda da base fechou depois de 138 dias aberta, e hoje 1.291 dos 2.089 deals abertos já passaram disso ($3,2 milhões parados). Numa simulação de 16 segundas com 30 vendedores, escolher os deals da semana pelo Score rendeu 52,5% mais receita do que perseguir o maior valor e 5% mais que o feeling, com menos da metade dos deals. Recomendo um piloto de 30 dias com metade do time para medir o efeito real.
+Construí um app em Streamlit que o vendedor abre na segunda de manhã e vê, numa tela só, os negócios dele separados pela próxima ação ("Atacar agora", "Fechar rápido", "Qualificar em 14 dias"...), cada um com Score de 0 a 100 e chance de fechar; ao abrir o negócio, uma frase explica o número. O achado que guiou o projeto: nesta base, o perfil do cliente (setor, porte, sede) não prevê se o deal fecha; o tempo prevê. Nenhuma venda da base fechou depois de 138 dias aberta, e hoje 1.291 dos 2.089 deals abertos já passaram disso ($3,2 milhões parados). Numa simulação de 16 segundas com 30 vendedores, escolher os deals da semana pelo Score rendeu 52,5% mais receita do que perseguir o maior valor e 5% mais que o feeling, com menos da metade dos deals. Recomendo um piloto de 30 dias com metade do time para medir o efeito real.
 
 ---
 
@@ -28,7 +28,7 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-Abre em http://localhost:8501. A primeira carga leva alguns segundos (cerca de 10 num notebook), porque calcula o pipeline inteiro; depois fica em cache. Na barra lateral, "Ver como vendedor" troca o vendedor; o app abre no que tem mais negócios em foco.
+Abre em http://localhost:8501. A primeira carga leva de 10 a 30 segundos, conforme a máquina, porque calcula o pipeline inteiro; depois fica em cache. Na barra lateral, "Ver como vendedor" troca o vendedor; o app abre no que tem mais negócios em foco.
 
 Para conferir os números deste README:
 
@@ -62,7 +62,7 @@ python analises/fator_carga.py      # efeito do fator carga
 | Limpar ou automação | Sem precedente, com conta, valor baixo | 232 | Régua automática ou fechar como Lost |
 | Completar cadastro ou limpar | Sem precedente, sem conta | 879 | Completar o cadastro em 7 dias ou fechar |
 
-Os parâmetros (data de referência 31/12/2017, limites de dias, piso de 5%, valor alto) ficam em `solution/config.py`. O desenho completo está em [`docs/PRD.md`](docs/PRD.md).
+Os parâmetros (limites de 14 e 90 dias, piso de 5%, valor alto) ficam em `solution/config.py`; a data de referência (31/12/2017) e o limite de 138 dias saem dos próprios dados. O desenho completo está em [`docs/PRD.md`](docs/PRD.md).
 
 ### O que o vendedor vê
 
@@ -87,6 +87,8 @@ Selos com dica para reverter: [esfriando](docs/screenshots/04-esfriando.png) e [
 | Deals trabalhados em 16 semanas | 54 | 14 | 23 |
 | Receita dos deals trabalhados | $57,3 mil | $39,6 mil | **$60,3 mil** |
 
+A coluna Score usa a chance só pela idade, como na simulação oficial. Com o fator carga, como no app, o resultado fica praticamente igual: +52,4% contra o maior valor, +5,2% contra o feeling e 49,3% das semanas em deal ganho.
+
 - **+52,5% de receita contra quem persegue o maior valor.** O Score ganha em 26 de 30 vendedores.
 - **+5% contra o feeling, com menos da metade dos deals.** O Score ganha em 19 de 30 vendedores.
 - **A curva certa importa:** com a primeira versão da curva (que só aprendia com deals fechados), a receita seria $47,5 mil, abaixo do feeling.
@@ -101,13 +103,14 @@ Selos com dica para reverter: [esfriando](docs/screenshots/04-esfriando.png) e [
 2. **Limpar o pipeline:** 879 deals sem conta e sem precedente ($2,13 milhões) poluem a carteira. Completar o cadastro em 7 dias ou fechar como Lost.
 3. **Pesquisa Win/Lost** com 5 perguntas obrigatórias ao fechar (motivo, objeção, decisor, concorrente, origem do lead), para alimentar o autoteste e substituir o piso de 5%.
 4. **Dados comportamentais na v2 do score:** engajamento, conteúdo consumido e nível de consciência do lead (pedidos pela metodologia do Alfredo Soares) não existem nesta base. Com eles, o score ganha uma dimensão de prontidão.
-5. **Visão do gerente:** região e gerente passaram no autoteste (+16 e +10 pontos), mas são iguais para todos os deals de um vendedor e não mudam a lista dele. Servem a um painel de gerente, fora desta entrega.
+5. **Visão do gerente:** a região do escritório de vendas e o gerente passaram no autoteste (+16 e +10 pontos), mas são iguais para todos os deals de um vendedor e não mudam a lista dele. Servem a um painel de gerente, fora desta entrega.
 
 ### Limitações
 
 - **Base sintética:** só o tempo se sustentou no teste. O corte de 138 dias é desta base; num CRM real, a curva deve ser recalculada.
 - **A simulação não mede causa:** supõe que dar atenção a um deal não muda a chance dele. Em 11 de 30 vendedores, o sorteio rendeu mais que o Score.
 - **O fator carga pode ser causalidade reversa:** vendedor bom fecha rápido, esvazia a carteira e aparece com "pouca carga". Não dá para separar isso com esta base.
+- **Faixas do fator carga:** o fator aprende com os tercis de carga dos deals fechados e é aplicado com os tercis dos deals abertos, que têm outros cortes. Alinhar os cortes é a próxima correção do `clima.py`.
 - **68% dos deals abertos não têm conta:** o Raio X fica sem ficha para eles, e "sem conta" não pode virar sinal (na base, só deal aberto fica sem conta).
 - **Premissas configuráveis:** piso de 5% para deal sem precedente e chance do dia 0 para Prospecting.
 - **Fora desta versão:** visão do gerente, gravação da consulta médica e da pesquisa Win/Lost, envio automático da régua de nutrição e playbook personalizado por lead (o atual é por regra).
@@ -123,8 +126,8 @@ O log completo, sessão por sessão e com os erros da IA numerados, está em [`p
 
 | Ferramenta | Para que usei |
 |---|---|
-| Claude (chat com acesso aos dados, ao Mac, ao Notion e ao Todoist) | Raio-x dos CSVs, teste das hipóteses, PRD, plano em fases, simulação das segundas, cronograma |
-| Claude Code (local, Sonnet) | Fases 1 a 3 do código e revisão independente antes de cada commit |
+| Claude (chat com acesso aos dados, ao Mac, ao Notion e ao Todoist) | Raio-x dos CSVs, teste das hipóteses, PRD, plano em fases, simulação das segundas, cronograma e o código das Fases 1 a 3 (dados, Clima, Score e Raio X) |
+| Claude Code (local, Sonnet) | Revisão independente e commit da Fase 3; primeira versão do app (Fase 4) |
 | Claude no app desktop (com acesso ao Mac) | Mockup clicável da tela do vendedor, construção do app, auditoria final, prints e este README |
 
 ### Workflow
@@ -133,7 +136,7 @@ O log completo, sessão por sessão e com os erros da IA numerados, está em [`p
 2. Pedi um raio-x dos dados e testei a minha tese de vendedor (prever os deals abertos pelos que já fecharam) antes de pedir código.
 3. Com a IA, escrevi o PRD e um plano em 7 fases, com a regra "a IA propõe, eu aprovo".
 4. Validei a lógica com a simulação das segundas antes de construir a interface. Ela derrubou a primeira curva.
-5. Código em fases pequenas, com testes e revisão independente no Claude Code antes de cada commit.
+5. Código em fases pequenas, com testes e revisão independente: o Claude Code revisou a Fase 3 antes do commit, e um revisor separado conferiu a entrega final.
 6. Testei o app como vendedor, rejeitei a tela de gerente e refiz a interface a partir de um mockup.
 7. Auditoria final: rodei a validação, conferi cada número deste README no código e instalei tudo do zero numa máquina limpa.
 
@@ -145,7 +148,7 @@ O log completo, sessão por sessão e com os erros da IA numerados, está em [`p
 | O A/B somava o mesmo deal várias vezes na receita | Conferindo a conta | Cada deal conta uma vez: +5% contra o feeling, +52,5% contra o maior valor |
 | O Raio X usaria vitórias do futuro com outra data de referência | Revisão independente no Claude Code | Filtro pela data de referência e 2 testes novos |
 | Citou um Score e um preço de produto sem rodar os dados | Desconfiei da explicação e cobrei a conferência na base | Regra nova: nenhum número sem rodar o código |
-| Achou fatores (vendedor, setor, conta) com treino e teste misturados no tempo | O autoteste do projeto derrubou os três, dois com o sinal invertido | Só entra sinal que passa no autoteste |
+| Achou fatores (vendedor, setor, conta) com treino e teste misturados no tempo | O autoteste do projeto derrubou os três: no período de teste, o sinal se inverteu | Só entra sinal que passa no autoteste |
 | Reescreveu o `clima.py` inteiro e quebrou 1 teste; o README que escreveu tinha números que o código não reproduz | Auditoria final rodando `pytest` e a simulação | Teste corrigido, README refeito só com números reproduzíveis, teste do fator carga versionado |
 | Commitou um arquivo de configuração local fora da pasta da submissão | Auditoria contra o CONTRIBUTING | Removido do git antes do PR |
 
