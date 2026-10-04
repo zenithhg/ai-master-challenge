@@ -10,7 +10,7 @@
 
 ## Executive Summary
 
-Construí um app em Streamlit que o vendedor abre na segunda de manhã e vê, numa tela só, os negócios dele separados pela próxima ação ("Atacar agora", "Fechar rápido", "Qualificar em 14 dias"...), cada um com Score de 0 a 100 e chance de fechar; ao abrir o negócio, uma frase explica o número. Por trás está o Clima do Deal, um algoritmo que testou os sinais que eu uso como vendedor e manteve só os que provaram nos dados: o perfil do cliente (setor, porte, sede) não prevê se o deal fecha; a idade do deal e a carga de trabalho do vendedor preveem. Nenhuma venda da base fechou depois de 138 dias aberta, e hoje 1.291 dos 2.089 deals abertos já passaram disso ($3,2 milhões parados). Numa simulação de 16 segundas com 30 vendedores, escolher os deals da semana pelo Score rendeu 52,5% mais receita do que perseguir o maior valor e 5% mais que o feeling, com menos da metade dos deals. Recomendo um piloto de 30 dias com metade do time para medir o efeito real.
+Construí um app em Streamlit que o vendedor abre na segunda de manhã e vê, numa tela só, os negócios dele separados pela próxima ação ("Atacar agora", "Fechar rápido", "Qualificar em 14 dias"...), cada um com Score de 0 a 100 e chance de fechar; ao abrir o negócio, uma frase explica o número. Por trás está o Clima do Deal, um algoritmo que testou os sinais que eu uso como vendedor e manteve só os que provaram nos dados: o perfil do cliente (setor, porte, sede) não prevê se o deal fecha; a idade do deal e a carga de trabalho do vendedor preveem. Nenhuma venda da base fechou depois de 138 dias aberta, e hoje 1.291 dos 2.089 deals abertos já passaram disso ($3,2 milhões parados). Numa simulação de 16 segundas com 30 vendedores, escolher os deals da semana pelo Score rendeu 52,5% mais receita do que perseguir o maior valor e 5% mais que o feeling, com menos da metade dos deals; para o time, isso equivale a cerca de $626 mil a mais por ano e 3.500 horas a menos em deal que nunca fecha. Recomendo um piloto de 30 dias com metade do time para medir o efeito real.
 
 ---
 
@@ -28,14 +28,15 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-Abre em http://localhost:8501. A primeira carga leva de 10 a 30 segundos, conforme a máquina, porque calcula o pipeline inteiro; depois fica em cache. Na barra lateral, "Ver como vendedor" troca o vendedor; o app abre no que tem mais negócios em foco.
+Abre em http://localhost:8501. A primeira carga leva de 10 a 30 segundos, conforme a máquina, porque calcula o pipeline inteiro; depois fica em cache. Na barra lateral, os filtros de região, gerente e vendedor escolhem a lista: o app abre no vendedor com mais negócios em foco, e "Todos" mostra a lista do time ou da região.
 
 Para conferir os números deste README:
 
 ```bash
 pytest                              # 34 testes das regras
 python -m lead_scorer.validacao     # simulação das segundas e autoteste dos sinais
-python analises/fator_carga.py      # efeito do fator carga
+python analises/fator_carga.py      # autoteste e efeito do fator carga
+python analises/impacto.py          # impacto por mês e por ano
 ```
 
 ### Abordagem
@@ -120,6 +121,7 @@ Os parâmetros (limites de 14 e 90 dias, piso de 5%, valor alto) ficam em `solut
 1. **Missão do dia** (print acima): os negócios do vendedor agrupados pela ação, do maior Score para o menor. "Atacar agora" e "Fechar rápido" abrem no topo; os selos 🌡️ esfriando e ⚠️ sem cadastro aparecem na linha.
 2. **Detalhe do lead, aba Raio X:** o porquê do Score em linguagem simples, a chance e o valor esperado, a dica para reverter cada selo, a ficha da conta (negociações, vitórias, aproveitamento contra o time, últimos 5 resultados, produto mais comprado), o que contas do mesmo porte compram e a matemática do 1% (o preço cabe no faturamento do cliente?).
 3. **Aba Playbook:** abertura sugerida pelo histórico da conta, as 3 perguntas da consulta médica, a matemática do 1% e a contraobjeção do momento, com base na metodologia de vendas do Alfredo Soares.
+4. **Filtros por região, gerente e vendedor:** em cascata na barra lateral. Com "Todos", a mesma tela mostra a lista da região ou do time de um gerente, com o nome do vendedor em cada linha ([print](docs/screenshots/06-filtro-time.png)).
 
 | Raio X | Playbook |
 |---|---|
@@ -146,6 +148,17 @@ A coluna Score usa a chance só pela idade, como na simulação oficial. Com o f
 
 **Fator carga** (`analises/fator_carga.py`): passou no autoteste nas 3 janelas (+8,6, +9,8 e +8,3 pontos para quem tem pouca carga). Na simulação das segundas, ele não muda a receita (-0,04%), mas sobe o acerto semanal de 48,2% para 49,3% e a nota de ordenação de 0,652 para 0,667 (0,5 é cara ou coroa). Ou seja, deixa a lista mais certeira sem trocar os deals que mais valem.
 
+**Impacto estimado por mês e por ano** (`python analises/impacto.py`), contra o feeling, que é como o time prioriza hoje:
+
+| | Por vendedor | Time (30 vendedores) |
+|---|---|---|
+| Receita a mais por mês | +$1.738 | +$52,1 mil |
+| Receita a mais por ano | +$20,9 mil | **+$626 mil** |
+| Horas a menos em deal que nunca fecha, por mês | 9,8 h | 294 h |
+| Horas a menos em deal que nunca fecha, por ano | 118 h (15 dias úteis) | **3.531 h** (1,7 vendedor em tempo integral) |
+
+É uma equivalência, não uma medição. Premissas: o ganho de 5,2% da simulação (chance do app contra o feeling) vale para a receita média mensal de 2017 ($33,4 mil por vendedor); a semana tem 40 horas, divididas entre os 5 deals em foco; as 16 semanas simuladas se repetem no ano. Quem mede o efeito de verdade é o piloto (Recomendações).
+
 **O pipeline hoje** (31/12/2017): 2.089 deals abertos, $4,97 milhões a preço de tabela. 1.291 deles (62%, $3,2 milhões) estão abertos há mais de 138 dias, sem precedente de fechamento. 1.425 (68%) não têm conta cadastrada. 6 de 27 vendedores não têm nenhum deal para atacar ou fechar rápido.
 
 ### Recomendações
@@ -164,7 +177,7 @@ A coluna Score usa a chance só pela idade, como na simulação oficial. Com o f
 - **A carga é relativa ao time:** a faixa de cada deal depende da carga dos outros naquele momento (o fator aprende com os tercis dos deals fechados e é aplicado com os tercis dos abertos). Num CRM real, vale recalibrar os cortes a cada trimestre.
 - **68% dos deals abertos não têm conta:** o Raio X fica sem ficha para eles, e "sem conta" não pode virar sinal (na base, só deal aberto fica sem conta).
 - **Premissas configuráveis:** piso de 5% para deal sem precedente e chance do dia 0 para Prospecting.
-- **Fora desta versão:** visão do gerente, gravação da consulta médica e da pesquisa Win/Lost, envio automático da régua de nutrição e playbook personalizado por lead (o atual é por regra).
+- **Fora desta versão:** painel do gerente (conversão e carga do time; hoje ele usa os filtros da mesma lista), gravação da consulta médica e da pesquisa Win/Lost, envio automático da régua de nutrição e playbook personalizado por lead (o atual é por regra).
 - **Desempenho:** a carga de cada deal é calculada com laços em Python; para um CRM maior, o cálculo precisa ser vetorizado.
 
 ---
